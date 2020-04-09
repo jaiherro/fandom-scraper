@@ -12,14 +12,16 @@ import (
 func main() {
 	// Instantiate default collector
 	c := colly.NewCollector(
-		colly.AllowedDomains("godoc.org"),
-		colly.AllowURLRevisit(),
-		colly.Async(true),
+	// colly.AllowedDomains("fandom.com"),
+	// colly.AllowURLRevisit(),
+	// colly.Async(true),
 	)
 
 	// On every a element which has href attribute call callback
-	c.OnHTML("table.wikitable tbody tr td b a", func(e *colly.HTMLElement) {
+	c.OnHTML("tbody tr td.oLeft b a", func(e *colly.HTMLElement) {
+		fmt.Println("got here")
 		link := e.Attr("href")
+		fmt.Println(link)
 		if strings.HasSuffix(link, "jpg") || strings.HasSuffix(link, "png") {
 			download(link)
 		}
