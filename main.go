@@ -2,44 +2,56 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/gocolly/colly"
 )
 
 func main() {
-	// Instantiate default collector
-	c := colly.NewCollector(
-	// colly.AllowedDomains("fandom.com"),
-	// colly.AllowURLRevisit(),
-	// colly.Async(true),
+	threadCollector := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"),
+	)
+	imageCollector := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"),
 	)
 
-	// On every a element which has href attribute call callback
-	c.OnHTML("tbody tr td.oLeft b a", func(e *colly.HTMLElement) {
-		fmt.Println("got here")
-		link := e.Attr("href")
-		fmt.Println(link)
-		if strings.HasSuffix(link, "jpg") || strings.HasSuffix(link, "png") {
-			download(link)
-		}
+	threadCollector.OnHTML("tbody tr td.oLeft b a", func(e *colly.HTMLElement) {
+		imageCollector.Visit("https://simpsons.fandom.com" + e.Attr("href") + "/Gallery")
 	})
 
-	// Before making a request print "Visiting ..."
-	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting", r.URL.String())
+	imageCollector.OnRequest(func(r *colly.Request) {
+		fmt.Println("Visiting:", r.URL.String())
 	})
 
-	// Start scraping on https://hackerspaces.org
-	c.Visit("https://simpsons.fandom.com/wiki/List_of_Episodes/")
+	imageCollector.OnHTML("a.image.lightbox img", func(e *colly.HTMLElement) {
+		go download(strings.Split(e.Attr("data-src"), "/revision/")[0], e.Attr("data-image-name"))
+		time.Sleep(200 * time.Millisecond)
+	})
+
+	threadCollector.Visit("https://simpsons.fandom.com/wiki/List_of_Episodes")
 }
 
-func download(url string) {
-	resp, err := http.Get(url)
-	if err != nil {
-		panic(err)
+func download(url string, name string) {
+	fmt.Println("Downloading:", name)
+	response, e := http.Get(url)
+	if e != nil {
+		log.Fatal(e)
 	}
-	fmt.Println(ioutil.ReadAll(resp.Body))
+	defer response.Body.Close()
+
+	file, err := os.Create(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
